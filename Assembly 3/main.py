@@ -3,7 +3,7 @@ import sys
 import requests
 
 from logger import log
-from comm import read_plc, reset_plc_counter
+from backups.comm import read_plc, reset_plc_counter
 import time
 from database import DBHelper
 from shift import get_shift, shift_a_start, shift_b_start, shift_c_start, get_current_total_time, break_check
