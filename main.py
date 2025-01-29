@@ -1,15 +1,101 @@
-"""this is main file of Assembly_1 machine"""
 import json
 import sys
 import requests
-
 from logger import log
-from comm import read_plc, reset_plc_counter
+from opc_client import cl_opc_client
 import time
 from database import DBHelper
 from shift import get_shift, shift_a_start, shift_b_start, shift_c_start, get_current_total_time, break_check
 from datetime import datetime, timedelta
 import schedule
+import os
+
+
+def manage_ip_config(default_machine_name=None):
+    try:
+        file_path = "machine_config"
+
+        if not os.path.exists(file_path):
+            with open(file_path, "w") as file:
+                file.write(f"Machine_NAME={default_machine_name}\n")
+            log.info(f"File '{file_path}' created with default configurations.")
+            return default_machine_name
+        else:
+            config = {}
+            with open(file_path, "r") as file:
+                for line_ in file:
+                    key, value = line_.strip().split("=", 1)
+                    config[key] = value if value != "None" else None
+
+            machine_name = config.get("Machine_NAME", default_machine_name)
+            log.info(f"Configurations from file: Machine_NAME={machine_name}")
+            return machine_name
+    except Exception as e:
+        log.error(f"Error: {e}, while managing HVIR configuration file.")
+        return None
+
+
+config_machine_name = manage_ip_config()
+MACHINE_NAME = config_machine_name
+log.info(f"config_machine_name: {config_machine_name}\n")
+
+machine_details = {
+    'Cosberg Assy-1': {
+        "opc_server_ip": "192.3.1.7",
+        "access_token": "p0mmGwZoiwwsb3awMJt6",
+        "connected_to_gw": "192.3.1.90",
+        "opc_node_ids": {
+            "ok_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ok"',
+            "ko_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ko"',
+            "red_light": 'ns=3;s="ledRed"',
+            "yellow_light": 'ns=3;s="ledYellow"',
+            "green_light": 'ns=3;s="ledGreen"',
+        }
+    },
+
+    'Cosberg Assy-2': {
+        "opc_server_ip": "192.3.1.2",
+        "access_token": "F5yOzQNQJ8EnDGiWqSOF",
+        "connected_to_gw": "192.3.1.90",
+        "opc_node_ids": {
+            "ok_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ok"',
+            "ko_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ko"',
+            "red_light": 'ns=3;s="ledRed"',
+            "yellow_light": 'ns=3;s="ledYellow"',
+            "green_light": 'ns=3;s="ledGreen"',
+        }
+    },
+
+    'Cosberg Assy-3': {
+        "opc_server_ip": "192.3.1.15",
+        "access_token": "e7B7vdMQACbxM7ImmCFi",
+        "connected_to_gw": "192.3.1.90",
+        "opc_node_ids": {
+            "ok_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ok"',
+            "ko_count": 'ns=3;s="COP_DB_L"."Totali"."Pezzi_Ko"',
+            "red_light": None,
+            "yellow_light": None,
+            "green_light": None,
+        }
+    },
+}
+
+machine_opc_ip = machine_details[config_machine_name]["opc_server_ip"]
+access_token = machine_details[config_machine_name]["access_token"]
+
+log.info(f"machine: {config_machine_name}, machine_opc_ip: {machine_opc_ip}, access_token: {access_token}\n")
+
+opc_url = f'opc.tcp://{machine_opc_ip}:4840'
+log.info(f"OPC URL: {opc_url} for machine: {config_machine_name}\n")
+node_ids = machine_details[config_machine_name]["opc_node_ids"]
+obj_opc_client = cl_opc_client(opc_url, node_ids)
+
+URL_ATTR = f'https://ithingspro.cloud/api/v1/{access_token}/attributes'
+URL_TELE = f'https://ithingspro.cloud/api/v1/{access_token}/telemetry'
+API = "https://ithingspro.cloud/Hettich/create_shift_data/"
+URL_GENERAL = 'https://ithingspro.cloud/Hettich/check_generalshift_status'
+
+SEND_DATA = True
 
 GL_breakdown_start = 0
 GL_breakdown_stop = 0
@@ -30,6 +116,7 @@ GL_CURR_REJECT_COUNT = 0
 
 GL_PREV_PART_COUNT = 0
 GL_PREV_REJECT_COUNT = 0
+start_duration = 0
 
 GL_PREV_READY_STATUS = True
 CONSTANT_YELLOW = True  # it is used to run only when ready is constant yellow
@@ -49,8 +136,6 @@ shift = ""
 alert = sys.maxsize
 GENERAL_SHIFT_STATUS = False
 
-MACHINE_NAME = "Cosberg Assy-1"
-
 
 def reset_counter():
     global GL_HEALTHY_START_TIME, GL_STOP_START_TIME, GL_READY_START_TIME, GL_PREV_HEALTHY_STATUS, GL_PREV_STOP_STATUS, PREVIOUS_CONSTANT_YELLOW_STAT
@@ -64,24 +149,14 @@ def reset_counter():
 
 def assign_data(data):
     global GL_CURR_PART_COUNT, GL_CURR_REJECT_COUNT, MACHINE_STATUS
-    if data[1] > 65000:
+    if data[0] > 65000:
         GL_CURR_PART_COUNT = 0
     else:
-        GL_CURR_PART_COUNT = data[1]
-    GL_CURR_REJECT_COUNT = data[0]
+        GL_CURR_PART_COUNT = data[0]
+    GL_CURR_REJECT_COUNT = data[1]
     MACHINE_STATUS['stop'] = data[2]
     MACHINE_STATUS['ready'] = data[3]
     MACHINE_STATUS['healthy'] = data[4]
-
-
-ACCESS_TOKEN = "p0mmGwZoiwwsb3awMJt6"
-URL_ATTR = f'https://ithingspro.cloud/api/v1/{ACCESS_TOKEN}/attributes'
-URL_TELE = f'https://ithingspro.cloud/api/v1/{ACCESS_TOKEN}/telemetry'
-API = "https://ithingspro.cloud/Hettich/create_shift_data/"
-
-URL_GENERAL = 'https://ithingspro.cloud/Hettich/check_generalshift_status'
-
-SEND_DATA = True
 
 
 def send_data(t, s):
@@ -102,50 +177,6 @@ def send_data(t, s):
         log.error(f"Error: {e}")
 
 
-# def send_status():
-#     global MACHINE_STATUS
-#     try:
-#         # "stop": d2[0],
-#         # "ready": d2[1],
-#         # "healthy": d2[2]
-#         current_date, current_shift = db.get_misc_data()
-#         payload = db.fetch_data(current_date, current_shift)
-#         payload['stop_status'] = MACHINE_STATUS['stop']
-#         payload['ready_status'] = MACHINE_STATUS['ready']
-#         payload['healthy'] = MACHINE_STATUS['healthy']
-#         log.info(f"send_data: {payload}")
-#         for k, v in payload.items():
-#             if v is None:
-#                 payload[k] = 0
-#         response = requests.post(URL_ATTR, json=payload, timeout=3)
-#         response.raise_for_status()
-#         log.info(f"status code {response.status_code}")
-#     except Exception as e:
-#         log.error(f"Error: {e}")
-
-
-# def send_shift_data():
-#     try:
-#         current_date, current_shift = db.get_misc_data()
-#         shift_data = db.get_shift_data(current_date, current_shift)
-#         payload = {
-#             "A_cycle_parts": shift_data["A_cycle_time_parts"],
-#             "A_real_parts": shift_data["A_real_time_parts"],
-#             "B_cycle_parts": shift_data["B_cycle_time_parts"],
-#             "B_real_parts": shift_data["B_real_time_parts"],
-#             "C_cycle_parts": shift_data["C_cycle_time_parts"],
-#             "C_real_parts": shift_data["C_real_time_parts"],
-#             "G_real_parts": shift_data["G_real_time_parts"],
-#             "G_cycle_parts": shift_data["G_cycle_time_parts"]
-#         }
-#
-#         response = requests.post(URL_ATTR, json=payload, timeout=3)
-#         response.raise_for_status()
-#         log.info(f"Shift data sent: {response.status_code}")
-#     except Exception as e:
-#         log.error(f"Error: {e}")
-
-
 def oee_calculations():
     """oee calculations"""
     global SHIFT_A_TOTAL_PARTS, SHIFT_B_TOTAL_PARTS, SHIFT_C_TOTAL_PARTS, SHIFT_A_CYCLE_PARTS, SHIFT_B_CYCLE_PARTS, SHIFT_C_CYCLE_PARTS
@@ -164,16 +195,6 @@ def oee_calculations():
             max_possible_production = int((data["healthy_time"] + data["ready_time"]) * 55)
             availability_planned_time = data['healthy_time'] + data["stop_time"] + data["ready_time"]
 
-            # real oee formula
-            # try:
-            #     quality = data['part_count'] / actual_production
-            #     oee = actual_production / max_possible_production
-            #     real_oee = oee * quality
-            #     real_oee = round(real_oee * 100, 2)
-            # except Exception as e:
-            #     log.error(f"Error: {e}")
-            #     real_oee = 0
-            # availability
             try:
                 availability = (operating_time + data["ready_time"]) / availability_planned_time
                 availability_percent = round(availability * 100, 2)
@@ -197,9 +218,7 @@ def oee_calculations():
             except Exception as e:
                 log.error(f"Error while calculating machine utilization : {e}")
                 machine_util = 0
-            # print(performance)
 
-            # Quality
             try:
                 quality = data['part_count'] / actual_production
                 quality_per = round(quality * 100, 2)
@@ -216,32 +235,6 @@ def oee_calculations():
                 log.error(f"Error:  {e}")
                 oee = 0
 
-            # payload = {
-            #     "performance": round(performance, 2),
-            #     "availability": round(availability, 2),
-            #     "quality": quality_per,
-            #     "oee": round(real_oee * 100, 2),
-            # }
-            # log.info(f"Oee: {payload}")
-            # # sending data
-            # response = requests.post(URL_TELE, json=payload, timeout=2)
-            # response.raise_for_status()
-            # log.info(f"Oee data sent (status:{response.status_code}")
-            # {
-            #     "date_": "2024-03-12",
-            #     "shift": "A",
-            #     "machine_name": "string",
-            #     "part_count": 0,
-            #     "reject_count": 0,
-            #     "healthy_time": 0,
-            #     "stop_time": 0,
-            #     "ready_time": 0,
-            #     "planned_time": 0,
-            #     "performance": 0,
-            #     "availibility": 0,
-            #     "quality": 0,
-            #     "oee": 0
-            # }
             if oee < 100:
                 payload_api = data
                 payload_api["performance"] = round(performance, 2)
@@ -287,153 +280,6 @@ def oee_calculations():
             log.info(f"Planned time is not available")
     except Exception as e:
         log.error(f"Error: {e}")
-
-
-# def send_day_count():
-#     global today
-#     try:
-#         prod_data = db.get_day_production(today)
-#         operating_time = prod_data['total_healthy']
-#         payload1 = {
-#             "day_count": prod_data["total_part_count"],
-#             "day_reject": prod_data["total_reject_count"],
-#             "day_up_time": round(operating_time, 2)
-#         }
-#         log.info(f"Day production : {payload1}")
-#         response = requests.post(URL_ATTR, json=payload1, timeout=3)
-#         response.raise_for_status()
-#         log.info(f"Day Count send to attritbutes : {response.status_code}")
-#     except Exception as e:
-#         log.error(f"Error : {e}")
-
-
-# def send_day_production():
-#     global today
-#     try:
-#         prod_data = db.get_day_production(today)
-#         actual_production = prod_data["total_part_count"] + prod_data["total_reject_count"]
-#         operating_time = prod_data['total_healthy']
-#         planned_time = prod_data["total_planned"]
-#         # try:
-#         #     quality = prod_data['total_part_count'] / actual_production
-#         #     oee = actual_production / (planned_time * 55)
-#         #     real_oee = oee * quality
-#         #     real_oee = round(real_oee * 100, 2)
-#         # except Exception as e:
-#         #     log.error(f"Error: {e}")
-#         #     real_oee = 0
-#         #
-#         # # availability
-#         try:
-#             availability = operating_time / planned_time
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             availability = 0
-#
-#         # performance
-#         try:
-#             max_possible_production = int(planned_time * 55)
-#             performance = actual_production / max_possible_production
-#         except Exception as e:
-#             log.error(f"Error: {e}")
-#             performance = 0
-#
-#         # Quality
-#         try:
-#             quality = prod_data['total_part_count'] / actual_production
-#             quality_per = round(quality * 100, 2)
-#             log.info(f"quality_per {quality_per}")
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             quality_per = 0
-#             quality = 0
-#
-#         try:
-#             # OEE
-#             oee = availability * performance * quality
-#             oee = round(oee * 100, 2)
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             oee = 0
-#         if oee < 100:
-#             payload = {
-#                 "day_Oee": oee,
-#                 "day_quality": quality_per,
-#             }
-#             log.info(f"Day production : {payload}")
-#             response = requests.post(URL_TELE, json=payload, timeout=3)
-#             response.raise_for_status()
-#             log.info(f"Day Oee sent to telemetry: {response.status_code}")
-#         else:
-#             log.info(f"Oee is greater than 100")
-#     except Exception as e:
-#         log.error(f"Error: {e}")
-
-
-# def send_shift_production():
-#     #global today, shift
-#     t, s = db.get_misc_data()
-#     try:
-#
-#         prod_data = db.fetch_data(t, s)
-#         actual_production = prod_data["part_count"] + prod_data["reject_count"]
-#         operating_time = prod_data['healthy_time']
-#         planned_time = prod_data["planned_time"]
-#         # try:
-#         #     quality = prod_data['total_part_count'] / actual_production
-#         #     oee = actual_production / (planned_time * 55)
-#         #     real_oee = oee * quality
-#         #     real_oee = round(real_oee * 100, 2)
-#         # except Exception as e:
-#         #     log.error(f"Error: {e}")
-#         #     real_oee = 0
-#         #
-#         # # availability
-#         try:
-#             availability = operating_time / planned_time
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             availability = 0
-#
-#         # performance
-#         try:
-#             max_possible_production = int(planned_time * 55)
-#             performance = actual_production / max_possible_production
-#         except Exception as e:
-#             log.error(f"Error: {e}")
-#             performance = 0
-#
-#         # Quality
-#         try:
-#             quality = prod_data['part_count'] / actual_production
-#             quality_per = round(quality * 100, 2)
-#             log.info(f"quality_per {quality_per}")
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             quality_per = 0
-#             quality = 0
-#
-#         try:
-#             # OEE
-#             oee = availability * performance * quality
-#             oee = round(oee * 100, 2)
-#         except Exception as e:
-#             log.error(f"Error : {e}")
-#             oee = 0
-#         if oee < 100:
-#             # key is day oee but sending shift wise oee
-#             payload = {
-#                 "day_Oee": oee,
-#                 "day_quality": quality_per,
-#             }
-#             log.info(f"Shift Oee : {payload}")
-#             response = requests.post(URL_TELE, json=payload, timeout=3)
-#             response.raise_for_status()
-#             log.info(f"Shift Oee sent to telemetry: {response.status_code}")
-#         else:
-#             log.info(f"Oee is greater than 100")
-#     except Exception as e:
-#         log.error(f"Error: {e}")
 
 
 def whats_app_status(status):
@@ -500,7 +346,6 @@ def reset_oee():
         log.error(f"Error while resetting oee: {e}")
 
 
-###############################################################################################
 def send_data_to_attributes():
     global MACHINE_STATUS, today
     current_date, current_shift = db.get_misc_data()
@@ -569,16 +414,11 @@ def send_data_to_attributes():
 
 
 schedule.every(5).seconds.do(send_data_to_attributes)
-######################################################################################
 schedule.every(30).seconds.do(oee_calculations)
-# schedule.every(1).minutes.do(send_shift_production)
-# schedule.every(5).seconds.do(send_status)
-# schedule.every(5).seconds.do(send_shift_data)
-# schedule.every(5).seconds.do(send_day_count)
+
 while True:
     try:
-        status = read_plc()
-        if status[1] is not None:
+        if obj_opc_client.connect():
             today = (datetime.today() - timedelta(hours=shift_a_start.hour, minutes=shift_a_start.minute)).strftime(
                 "%F")
             curr_date, curr_shift = db.get_misc_data()
@@ -631,16 +471,16 @@ while True:
                 whats_app_status(False)
 
             if FL_RESET:
-                reset_counter()
-                reset_plc_counter()
+                # reset_counter()
+                # reset_plc_counter()
                 # current_shift_time = time.time()
                 # GL_HEALTHY_START_TIME = sys.maxsize
                 # GL_BLINKING_START_TIME = sys.maxsize
                 # GL_STOP_START_TIME = sys.maxsize
                 # GL_READY_START_TIME = sys.maxsize
                 FL_RESET = False
-            data = read_plc()
-            log.info(f"Data from PLC: {data}")
+            data = obj_opc_client.read_values()
+            log.info(f"Data from OPC: {data}")
             assign_data(data)
             curr_date, curr_shift = db.get_misc_data()
             if curr_shift != 'NA':
@@ -659,7 +499,6 @@ while True:
                     healthy_duration = round((time.time() - GL_HEALTHY_START_TIME) / 60, 2)
                     db.add_healthy_time(curr_date, curr_shift, healthy_duration)
                     GL_HEALTHY_START_TIME = time.time()
-
 
                 else:
                     if GL_PREV_HEALTHY_STATUS:
@@ -730,6 +569,7 @@ while True:
                         log.info(f"+++++++++++++++Breakdown Started++++++++++++++++++")
                 else:
                     blinking = False
+
                     GL_BLINKING_START_TIME = sys.maxsize
                     GL_BREAKDOWN_STATUS = False
 
@@ -743,7 +583,9 @@ while True:
 
                 # adding planned data into database
                 # if current_shift_time:
-                planned_production = round((get_current_total_time(curr_shift)) / 60, 2)
+                # planned_production = round((get_current_total_time(curr_shift)) / 60, 2)
+                data = db.fetch_data(curr_date, curr_shift)
+                planned_production = data["healthy_time"] + data["ready_time"] + data["stop_time"]
                 log.info(f"planned production : {planned_production}")
                 db.add_planned_production_time(curr_date, curr_shift, planned_production)
                 if SEND_DATA:
