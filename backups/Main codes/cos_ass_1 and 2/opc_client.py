@@ -23,6 +23,7 @@ class cl_opc_client:
                 self.client.connect()
                 self.connected = True
                 log.info(f"Connected to OPC server at {self.client.server_url}")
+                time.sleep(1)
                 return True
             except Exception as e:
                 log.warning(f"Connection attempt {attempt} failed: {e}")
@@ -66,6 +67,7 @@ class cl_opc_client:
                 except Exception as e:
                     log.error(f"Error reading node '{node_name}': {e}")
                     values.append(None)
+                time.sleep(1)
 
             return values
         except Exception as e:

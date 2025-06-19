@@ -3,7 +3,7 @@ import sys
 import requests
 
 from logger import log
-from backups.comm import read_plc, reset_plc_counter
+from comm import read_plc, reset_plc_counter
 import time
 from database import DBHelper
 from shift import get_shift, shift_a_start, shift_b_start, shift_c_start, get_current_total_time, break_check
@@ -159,8 +159,8 @@ def oee_calculations():
             if planned_time < 0:
                 planned_time = 0
             actual_production = data["part_count"] + data["reject_count"]
-            max_possible_production = int(planned_time * 55)
-            availability_planned_time = planned_time
+            max_possible_production = int((data["healthy_time"] + data["ready_time"]) * 50)
+            availability_planned_time = operating_time + data["ready_time"]
             # # real oee formula
             # try:
             #     quality = data['part_count'] / actual_production
@@ -172,7 +172,7 @@ def oee_calculations():
             #     real_oee = 0
             # availability
             try:
-                availability = operating_time / availability_planned_time
+                availability = availability_planned_time / availability_planned_time
                 availability_percent = round(availability * 100, 2)
             except Exception as e:
                 log.error(f"Error: {e}")
@@ -181,7 +181,8 @@ def oee_calculations():
 
             # performance
             try:
-                performance = actual_production / max_possible_production
+                performance = (1.2 * actual_production) / ((operating_time + data["ready_time"]) * 60)
+                # performance = actual_production / max_possible_production
             except Exception as e:
                 log.error(f"Error: {e}")
                 performance = 0
@@ -249,12 +250,16 @@ def oee_calculations():
                 except Exception as e:
                     log.error(f"Error: {e}")
 
+                loss_time_ = data["stop_time"] + data["ready_time"]
+                log.info(f'loss_time for telemetry: {loss_time_}')
+
                 try:
                     payload = {
                         "day_Oee": oee,
                         "day_quality": quality_per,
                         "machine_util": round(machine_util, 2),
-                        "availability_percent": availability_percent
+                        "availability_percent": availability_percent,
+                        "loss_time": loss_time_
                     }
                     log.info(f"Shift Oee : {payload}")
                     response = requests.post(URL_TELE, json=payload, timeout=2)
@@ -476,7 +481,7 @@ def send_data_to_attributes():
         # operating_time = prod_data['total_healthy']
         # planned_time = prod_data["total_planned"]
         part_losses = shift_data[f"{current_shift}_cycle_time_parts"] - shift_data[f"{current_shift}_real_time_parts"]
-        losses = part_losses / 55
+        losses = part_losses / 50
         payload["loss_time"] = round(losses, 2)
         db.add_ready_time(curr_date, curr_shift, payload["loss_time"])
         payload['healthy_time'] = round(data["planned_time"] - payload["loss_time"], 2)

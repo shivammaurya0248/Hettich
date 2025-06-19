@@ -148,15 +148,37 @@ def reset_counter():
 
 
 def assign_data(data):
-    global GL_CURR_PART_COUNT, GL_CURR_REJECT_COUNT, MACHINE_STATUS
-    if data[0] > 65000:
-        GL_CURR_PART_COUNT = 0
-    else:
-        GL_CURR_PART_COUNT = data[0]
-    GL_CURR_REJECT_COUNT = data[1]
-    MACHINE_STATUS['stop'] = data[2]
-    MACHINE_STATUS['ready'] = data[3]
-    MACHINE_STATUS['healthy'] = data[4]
+    try:
+        global GL_CURR_PART_COUNT, GL_CURR_REJECT_COUNT, MACHINE_STATUS
+        if data[0] > 65000:
+            GL_CURR_PART_COUNT = 0
+        else:
+            GL_CURR_PART_COUNT = data[0]
+        GL_CURR_REJECT_COUNT = data[1]
+
+        stop_status = data[2]
+        if stop_status is False:
+            stop_status = 0
+        elif stop_status is True:
+            stop_status = 1
+
+        ready_status = data[2]
+        if ready_status is False:
+            ready_status = 0
+        elif ready_status is True:
+            ready_status = 1
+
+        healthy_status = data[2]
+        if healthy_status is False:
+            healthy_status = 0
+        elif healthy_status is True:
+            healthy_status = 1
+
+        MACHINE_STATUS['stop'] = stop_status
+        MACHINE_STATUS['ready'] = ready_status
+        MACHINE_STATUS['healthy'] = healthy_status
+    except Exception as e:
+        log.error(f"Error: {e}")
 
 
 def send_data(t, s):
@@ -183,6 +205,7 @@ def oee_calculations():
     try:
         current_date, current_shift = db.get_misc_data()
         data = db.fetch_data(current_date, current_shift)
+
         if data['planned_time'] is not None:
             # for k, v in data.items():
             #     if v is None:
@@ -235,12 +258,17 @@ def oee_calculations():
                 log.error(f"Error:  {e}")
                 oee = 0
 
+
             if oee < 100:
+
                 payload_api = data
                 payload_api["performance"] = round(performance, 2)
                 payload_api["availability"] = round(availability, 2)
                 payload_api["quality"] = quality_per
                 payload_api['oee'] = oee
+
+                loss_time_ = data["stop_time"] + data["ready_time"]
+                log.info(f'loss_time for telemetry: {loss_time_}')
 
                 log.info(f"Api : {payload_api}")
                 try:
@@ -255,6 +283,8 @@ def oee_calculations():
                         log.info(f'Sync table data deleted')
                     else:
                         log.info("Sync data is not available")
+
+                    log.info(f'Sending Data to telemetry')
                     response = requests.post(API, json=payload_api, timeout=2)
                     response.raise_for_status()
                     log.info(f"Api data sent")
@@ -266,7 +296,8 @@ def oee_calculations():
                         "day_Oee": oee,
                         "day_quality": quality_per,
                         "machine_util": round(machine_util, 2),
-                        "availability_percent": availability_percent
+                        "availability_percent": availability_percent,
+                        "loss_time": loss_time_
                     }
                     log.info(f"Shift Oee : {payload}")
                     response = requests.post(URL_TELE, json=payload, timeout=2)
@@ -377,6 +408,7 @@ def send_data_to_attributes():
         payload['ready_status'] = MACHINE_STATUS['ready']
         payload['healthy'] = MACHINE_STATUS['healthy']
         payload['loss_time'] = data_attr["stop_time"] + data_attr["ready_time"]
+
     except Exception as e:
         log.error(f"Error:{e}")
 
@@ -457,6 +489,7 @@ while True:
                 shift = get_shift(GENERAL_SHIFT_STATUS)
 
             if curr_shift != shift:
+                # todo: send production count to whatsapp api
                 # it will send true whenever shift changes to A
                 if shift == 'A' and curr_shift != 'NA':
                     whats_app_status(True)
@@ -511,6 +544,8 @@ while True:
 
                 # here tracking prev healthy status so that we can identify whether we have to stop duration or not
                 planned_break_status = break_check(curr_shift)
+
+
                 if MACHINE_STATUS['stop']:
                     if GL_STOP_START_TIME != sys.maxsize and planned_break_status:
                         stop_duration = round((time.time() - GL_STOP_START_TIME) / 60, 2)
@@ -537,6 +572,7 @@ while True:
                         GL_PREV_STOP_STATUS = False
                     GL_STOP_START_TIME = sys.maxsize
                     send_alarm_status(False)
+
                 if MACHINE_STATUS['ready'] and not MACHINE_STATUS['healthy'] and not MACHINE_STATUS['stop']:
                     if GL_READY_START_TIME > time.time():
                         log.info(f"+++++READY duration starts+++++")

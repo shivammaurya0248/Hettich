@@ -3,6 +3,6 @@
 logs
 rs485
 # files to ignore
-HMT 1/hettich.db
+backups/HMT 1/hettich.db
 hettich.db
 hettich_demo.zip

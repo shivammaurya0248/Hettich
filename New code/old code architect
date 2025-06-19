@@ -1,0 +1,73 @@
+# OEE payload sending API
+
+URL = "https://ithingspro.cloud/Hettich/create_shift_data/"
+
+
+{
+  "date_": "2025-06-15",
+  "shift": "A",
+  "machine_name": "string",
+  "part_count": 0,
+  "reject_count": 0,
+  "healthy_time": 0,
+  "stop_time": 0,
+  "ready_time": 0,
+  "planned_time": 0,
+  "performance": 0,
+  "availability": 0,
+  "quality": 0,
+  "oee": 0
+}
+
+payload_api = data
+payload_api["performance"] = machine_util
+payload_api["availability"] = availability_percent
+payload_api["quality"] = quality_per
+payload_api['oee'] = oee
+response = requests.post(API, json=payload_api, timeout=3)
+
+
+
+URL_ATTR = f'https://ithingspro.cloud/api/v1/{access_token}/attributes'
+payload = {
+        "whats_app_status": status
+    }
+payload = {
+        "alarm_status": status
+    }
+payload = {
+        'stop_status': 0,
+        'ready_status': 0,
+        'healthy': 0,
+        "A_cycle_parts": 0,
+        "A_real_parts": 0,
+        "B_cycle_parts": 0,
+        "B_real_parts": 0,
+        "C_cycle_parts": 0,
+        "C_real_parts": 0,
+        "G_real_parts": 0,
+        "G_cycle_parts": 0,
+        # "day_count": 0,
+        # "day_reject": 0,
+        "day_up_time": 0,
+    }
+response = requests.post(URL_ATTR, json=payload, timeout=3)
+
+
+
+URL_TELE = f'https://ithingspro.cloud/api/v1/{access_token}/telemetry'
+payload = {
+            "day_Oee": oee,
+            "day_quality": quality_per,
+            "machine_util": machine_util,
+            "availability_percent": availability_percent,
+            "loss_time": loss_time_
+            "date": t,
+            "shift": s,
+            "part_count": data['part_count'],
+            "reject_count": data['reject_count']
+            }
+
+log.info(f"sending production data to telemetry")
+log.info(f"Tele_payload: {payload_api}")
+response = requests.post(URL_TELE, json=payload, timeout=2)

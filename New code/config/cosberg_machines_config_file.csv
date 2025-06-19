@@ -1,0 +1,6 @@
+machine_name,access_token,plc_ip,part_count_addr,reject_count_addr,red_light_addr,yellow_light_addr,green_light_addr
+Cosberg Assy-01,p0mmGwZoiwwsb3awMJt6,192.3.1.7,4114,4112,2050,2051,2052
+Cosberg Assy-02,F5yOzQNQJ8EnDGiWqSOF,192.3.1.2,4114,4112,2050,2051,2052
+Cosberg Assy-03,e7B7vdMQACbxM7ImmCFi,192.3.2.15,4114,4112,2050,2051,2052
+HMT Assy-1,0Stl8YrGxjif4MaZNC1B,10.120.70.50,4114,4112,2050,2051,2052
+HMT Assy-2,lHR9XG4N9tifdWLsgzzw,10.120.70.150,4114,4112,2050,2051,2052
