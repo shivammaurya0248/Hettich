@@ -35,7 +35,7 @@ if not os.path.isdir(CONFDIR):
     except Exception as e:
         log.error(f"[-] Can't create dir configuration Error: {e}")
 
-machine_config_file = f"{CONFDIR}/s_seven_machines_file.csv"
+machine_config_file = f"{CONFDIR}/cosberg_machines_config_file.csv"
 server_config_file = f"{CONFDIR}/server_config_file.csv"
 
 machine_obj = {}
@@ -48,12 +48,18 @@ HOST = None
 
 
 class CL_SNAP7:
-    def __init__(self, logger, plc_ip):
+    def __init__(self, logger, plc_ip, start_addr):
 
         self.log = logger
         self.plc_ip = plc_ip
+        self.plc_port = 502
+        self.unit_id = 1
+        self.TIMEOUT = 5
+        self.start_addr = start_addr
+        self.reset_reg_addr = 4100
+        self.RESET_VALUE = 28000
 
-    def is_connected(self) -> bool:
+    def is_connected(self,) -> bool:
         try:
             client = snap7.client.Client()
             for i in range(3):
@@ -82,110 +88,52 @@ class CL_SNAP7:
             self.log.error(f"[!] Error reading integer values: {e}")
             return []
 
-    # def read_boolean(self, output_byte_addr: int, bit_positions: list) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         byte_data = client.read_area(Areas.PA, 0, output_byte_addr, 1)
-    #         data = [get_bool(byte_data, 0, bit) for bit in bit_positions]
-    #         self.log.info(f'boolean_list: {data}')
-    #         self.log.info(f" ")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error while reading machine statuses: {e}")
-
-    # def read_HMTs(self) -> list:
-    #     try:
-    #         data = []
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         buffer1 = client.read_area(snap7.types.Areas.DB, 400, 4, 4)
-    #         buffer1 = struct.unpack(">I", buffer1)[0]
-    #         buffer2 = client.read_area(snap7.types.Areas.DB, 400, 8, 4)
-    #         buffer2 = struct.unpack(">I", buffer2)[0]
-    #
-    #         buffer3 = client.read_area(snap7.types.Areas.DB, 400, 0, 8)
-    #         buffer3 = self.bytearray_to_bool_list(buffer3)
-    #         buffer3 = list(buffer3[:3])
-    #         data.append(buffer1)
-    #         data.append(buffer2)
-    #         data = data + buffer3
-    #         self.log.info(f'HMT_data_list: {data}')
-    #         self.log.info(f" ")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error while reading machine statuses: {e}, [{self.plc_ip}]")
-    #
-    # def read_integer2(self, db_num: int, offsets: list) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         data = []
-    #         for off in offsets:
-    #             buf = client.read_area(snap7.types.Areas.DB, db_num, off, 4)
-    #             data.append(struct.unpack(">I", buf)[0])
-    #         self.log.info(f"integer_data: {data}")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error reading integer values: {e}")
-    #         return []
-    #
-    # def read_boolean2(self, db_num: int, start: int, bit_count: int) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         buf = client.read_area(snap7.types.Areas.DB, db_num, start, bit_count)
-    #         bools = list(self.bytearray_to_bool_list(buf))[:bit_count]
-    #         self.log.info(f'boolean_list: {bools}')
-    #         return bools
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error reading boolean values: {e}")
-    #         return []
-    #
-    # @staticmethod
-    # def bytearray_to_bool_list(byte_array):
-    #     bool_list = []
-    #     for byte in byte_array:
-    #         for _ in range(8):
-    #             bool_list.append(bool(byte & 1))
-    #             byte >>= 1
-    #     return bool_list
-
-    def read_booleans(self, area, db_number=0, start_address=0, bit_positions=None, byte_count=1):
-        """
-        Read booleans from PLC memory areas.
-
-        Args:
-            area: 'DB', 'PA', 'PE', 'MK'
-            db_number: DB number (for DB area only)
-            start_address: starting byte address
-            bit_positions: list of bit positions [0-7], None for all bits
-            byte_count: number of bytes to read
-        """
-
-        areas = {'DB': Areas.DB, 'PA': Areas.PA, 'PE': Areas.PE, 'MK': Areas.MK}
+    def read_boolean(self, output_byte_addr: int, bit_positions: list) -> list:
         try:
             client = snap7.client.Client()
             client.connect(self.plc_ip, 0, 1)
-            data = client.read_area(areas[area], db_number if area == 'DB' else 0, start_address, byte_count)
-            result = []
-
-            for i in range(byte_count):
-                bit_list = bit_positions if bit_positions else range(8)
-                result.extend([bool(data[i] & (1 << b)) for b in bit_list])
-
-            self.log.info(f'boolean_list: {result}')
-
-            return result
+            byte_data = client.read_area(Areas.PA, 0, output_byte_addr, 1)
+            data = [get_bool(byte_data, 0, bit) for bit in bit_positions]
+            self.log.info(f'boolean_list: {data}')
+            self.log.info(f" ")
+            return data
         except Exception as e:
-            self.log.error(f"Error reading {area}: {e}")
-            return []
+            self.log.error(f"[!] Error while reading machine statuses: {e}")
+
+    def read_HMTs(self) -> list:
+        try:
+            data = []
+            client = snap7.client.Client()
+            client.connect(self.plc_ip, 0, 1)
+            buffer1 = client.read_area(snap7.types.Areas.DB, 400, 4, 4)
+            buffer1 = struct.unpack(">I", buffer1)[0]
+            buffer2 = client.read_area(snap7.types.Areas.DB, 400, 8, 4)
+            buffer2 = struct.unpack(">I", buffer2)[0]
+            buffer3 = client.read_area(snap7.types.Areas.DB, 400, 0, 8)
+            buffer3 = self.bytearray_to_bool_list(buffer3)
+            buffer3 = list(buffer3[:3])
+            data.append(buffer1)
+            data.append(buffer2)
+            data = data + buffer3
+            self.log.info(f'HMT_data_list: {data}')
+            self.log.info(f" ")
+            return data
+        except Exception as e:
+            self.log.error(f"[!] Error while reading machine statuses: {e}, [{self.plc_ip}]")
+
+    @staticmethod
+    def bytearray_to_bool_list(byte_array):
+        bool_list = []
+        for byte in byte_array:
+            for _ in range(8):
+                bool_list.append(bool(byte & 1))
+                byte >>= 1
+        return bool_list
 
 
 class CL_MAIN:
-    def __init__(self, machine_name_, access_token, plc_ip, area, int_db_number, bool_db_num,
-                 bool_start_address, part_count, reject_count, red_light, yellow_light,
-                 green_light):
+    def __init__(self, machine_name_, access_token, plc_ip, part_count_addr, reject_count_addr,
+                 red_light_addr, yellow_light_addr, green_light_addr):
 
         self.machine_name = machine_name_
 
@@ -193,26 +141,15 @@ class CL_MAIN:
                                 logger_file_name=self.machine_name)
 
         self.plc_ip = plc_ip
-        self.db_area = area
-        self.int_db_num = int_db_number
-        self.bool_db_num = bool_db_num
-        self.bool_start_address = bool_start_address
-        self.int_offsets = [part_count, reject_count]
-        self.bool_offsets = [red_light, yellow_light, green_light]
-
-        self.log.info(f' ')
-        self.log.info(f'===========machine_name: {self.machine_name}========')
-        self.log.info(f'plc_ip: {self.plc_ip}')
-        self.log.info(f'db_area: {self.db_area}')
-        self.log.info(f'int_db_num: {self.int_db_num}')
-        self.log.info(f'bool_db_num: {self.bool_db_num}')
-        self.log.info(f'bool_start_address: {self.int_offsets}')
-        self.log.info(f'bool_offsets: {self.bool_offsets}')
-        self.log.info(f' ')
+        self.part_count_addr = part_count_addr  # 4114
+        self.reject_count_addr = reject_count_addr  # 4112
+        self.green_light_addr = green_light_addr  # 2052
+        self.yellow_light_addr = yellow_light_addr  # 2051
+        self.red_light_addr = red_light_addr  # 2050
 
         self.access_token = access_token
 
-        self.obj_snap7 = CL_SNAP7(self.log, plc_ip)
+        self.obj_modbus = CL_SNAP7(self.log, plc_ip, reject_count_addr)
         self.obj_conversions = ShiftManager(self.log)
         self.obj_db = DBHelper(self.machine_name, self.log)
         self.obj_alerts = CL_Alerts(HOST, self.access_token, self.log)
@@ -715,8 +652,8 @@ class CL_MAIN:
 
                 self.breakdown_status = False
 
-                # self.obj_snap7.write_counter(self.part_count_addr)
-                # self.obj_snap7.write_counter(self.reject_count_addr)
+                # self.obj_modbus.write_counter(self.part_count_addr)
+                # self.obj_modbus.write_counter(self.reject_count_addr)
                 self.part_count = 0
                 self.prev_part_count = 0
                 self.obj_db.add_production_data(self.plant_date, self.curr_shift, self.target_count, self.part_count,
@@ -730,7 +667,7 @@ class CL_MAIN:
     def main(self) -> None:
         try:
             while 1:
-                is_connected = self.obj_snap7.is_connected()
+                is_connected = self.obj_modbus.is_connected()
                 self.log.info(f'is_connected: {is_connected}')
                 try:
                     if is_connected:
@@ -756,14 +693,13 @@ class CL_MAIN:
                 self.log.info(f"-------*{self.machine_name} [{self.plc_ip}] CONNECTION IS ACTIVE*----------")
                 self.plant_date, self.curr_shift = self.obj_db.get_misc_data()
 
-                # if self.machine_name.startswith('HMT'):
-                #     data_list = self.obj_snap7.read_HMTs()
-                #     self.part_count, self.reject_count,  operating_status, idle_status, breakdown_status = data_list
-                # else:
-                self.part_count, self.reject_count = self.obj_snap7.read_integer(self.int_db_num, self.int_offsets)
-                status_data = self.obj_snap7.read_booleans(self.db_area, self.bool_db_num,
-                                                           self.bool_start_address, self.bool_offsets)
-                operating_status, idle_status, breakdown_status = status_data
+                if self.machine_name.startswith('HMT'):
+                    data_list = self.obj_modbus.read_HMTs()
+                    self.part_count, self.reject_count,  operating_status, idle_status, breakdown_status = data_list
+                else:
+                    self.part_count, self.reject_count = self.obj_modbus.read_integer(101, [56, 60])
+                    status_data = self.obj_modbus.read_boolean(5, [2, 3, 4])
+                    operating_status, idle_status, breakdown_status = status_data
 
                 if self.part_count < 0 or self.part_count > 65000:
                     self.part_count = 0
@@ -849,15 +785,11 @@ if __name__ == "__main__":
             confHandler.create_empty_csv(machine_config_file, ['machine_name',
                                                                'access_token',
                                                                'plc_ip',
-                                                               'area',
-                                                               'int_db_number',
-                                                               'bool_db_number',
-                                                               'bool_start_address',
-                                                               'part_count',
-                                                               'reject_count',
-                                                               'red_light',
-                                                               'yellow_light',
-                                                               'green_light'])
+                                                               'part_count_addr',
+                                                               'reject_count_addr',
+                                                               'red_light_addr',
+                                                               'yellow_light_addr',
+                                                               'green_light_addr'])
         if not os.path.exists(server_config_file):
             confHandler.create_empty_csv(server_config_file, ['HOST'])
 
@@ -876,15 +808,11 @@ if __name__ == "__main__":
                 machine_obj[machine['machine_name']] = CL_MAIN(machine['machine_name'],
                                                                machine['access_token'],
                                                                machine['plc_ip'],
-                                                               machine['area'],
-                                                               int(machine['int_db_number']),
-                                                               int(machine['bool_db_number']),
-                                                               int(machine['bool_start_address']),
-                                                               int(machine['part_count']),
-                                                               int(machine['reject_count']),
-                                                               int(machine['red_light']),
-                                                               int(machine['yellow_light']),
-                                                               int(machine['green_light']))
+                                                               int(machine['part_count_addr']),
+                                                               int(machine['reject_count_addr']),
+                                                               int(machine['red_light_addr']),
+                                                               int(machine['yellow_light_addr']),
+                                                               int(machine['green_light_addr']))
                 if machine_obj.get(machine['machine_name']):
                     log.info(f"[+] Init Successful for {machine['machine_name']}...")
                 else:

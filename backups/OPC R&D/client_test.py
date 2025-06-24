@@ -1,6 +1,6 @@
 import sys
 import asyncio
-sys.path.insert(0, "..")
+sys.path.insert(0, "../..")
 import logging
 
 from asyncua import Client, ua, tools

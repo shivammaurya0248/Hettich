@@ -1,0 +1,6 @@
+machine_name,access_token,plc_ip,area,int_db_number,bool_db_number,bool_start_address,part_count,reject_count,red_light,yellow_light,green_light
+Cosberg Assy-01,p0mmGwZoiwwsb3awMJt6,192.3.1.7,PA,101,0,5,56,60,2,3,4
+Cosberg Assy-02,F5yOzQNQJ8EnDGiWqSOF,192.3.1.2,PA,101,0,5,56,60,2,3,4
+Cosberg Assy-03,e7B7vdMQACbxM7ImmCFi,192.3.1.15,PA,1110,0,5,56,60,0,1,7
+HMT Assy-1,0Stl8YrGxjif4MaZNC1B,10.120.70.50,DB,400,400,0,4,8,0,1,2
+HMT Assy-2,lHR9XG4N9tifdWLsgzzw,10.120.70.150,DB,400,400,0,4,8,0,1,2

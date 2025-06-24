@@ -4,7 +4,7 @@ import struct
 
 client = snap7.client.Client()
 
-s7_ip = "10.120.70.50"
+s7_ip = "192.3.1.15"
 
 
 def connect():
