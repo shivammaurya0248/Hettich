@@ -761,6 +761,9 @@ class CL_MAIN:
                 #     self.part_count, self.reject_count,  operating_status, idle_status, breakdown_status = data_list
                 # else:
                 self.part_count, self.reject_count = self.obj_snap7.read_integer(self.int_db_num, self.int_offsets)
+
+                self.prev_part_count = self.obj_db.get_prev_part_count(self.plant_date, self.curr_shift)
+
                 status_data = self.obj_snap7.read_booleans(self.db_area, self.bool_db_num,
                                                            self.bool_start_address, self.bool_offsets)
                 operating_status, idle_status, breakdown_status = status_data
@@ -786,21 +789,24 @@ class CL_MAIN:
                     self.calculate_breakdown_time(breakdown_status)
                     self.attr_payload['stop_status'] = breakdown_status
 
-                self.obj_db.add_production_data(self.plant_date, self.curr_shift, self.target_count, self.part_count,
-                                                self.reject_count, self.operating_time, self.idle_time,
-                                                self.breakdown_time)
-
                 self.calling_breakdown_funcs()
 
-                if (time.time() - self.LAST_OEE_PAYLOAD_SENT) > 60:
-                    self.calculations()
-                    self.post_to_api()
-                    self.post_to_telemetry()
-                    self.post_to_attribute()
-                    send_system_info(HOST, self.access_token)
-                    self.LAST_OEE_PAYLOAD_SENT = time.time()
+                if self.part_count > self.prev_part_count:
+
+                    self.obj_db.add_production_data(self.plant_date, self.curr_shift, self.target_count, self.part_count,
+                                                    self.reject_count, self.operating_time, self.idle_time,
+                                                    self.breakdown_time)
+
+                    if (time.time() - self.LAST_OEE_PAYLOAD_SENT) > 60:
+                        self.calculations()
+                        self.post_to_api()
+                        self.post_to_telemetry()
+                        self.post_to_attribute()
+                        send_system_info(HOST, self.access_token)
+                        self.LAST_OEE_PAYLOAD_SENT = time.time()
 
                 self.log.info(' ')
+                self.log.info(f"[+] prev_part_count: {self.prev_part_count}")
                 self.log.info(f"[+] part_count: {self.part_count}")
                 self.log.info(f"[+] reject_count: {self.reject_count}")
                 self.log.info(f"[+] green-light/operating status: {operating_status}")
