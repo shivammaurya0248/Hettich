@@ -160,10 +160,11 @@ class DBHelper:
             self.log.error(f"Error in get_prev_part_count {e}")
             return 0
 
+
     def add_start_time(self, date_, shift, status, table_name):
         try:
+            self.add_stop_time(table_name)
             if status:
-                self.add_stop_time(table_name)
                 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self.c.execute(f'''INSERT INTO {table_name}(date_, shift, time_, startTime)
                                    VALUES (?,?,?,?)''', (date_, shift, now, now))

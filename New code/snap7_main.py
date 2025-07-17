@@ -82,75 +82,6 @@ class CL_SNAP7:
             self.log.error(f"[!] Error reading integer values: {e}")
             return []
 
-    # def read_boolean(self, output_byte_addr: int, bit_positions: list) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         byte_data = client.read_area(Areas.PA, 0, output_byte_addr, 1)
-    #         data = [get_bool(byte_data, 0, bit) for bit in bit_positions]
-    #         self.log.info(f'boolean_list: {data}')
-    #         self.log.info(f" ")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error while reading machine statuses: {e}")
-
-    # def read_HMTs(self) -> list:
-    #     try:
-    #         data = []
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         buffer1 = client.read_area(snap7.types.Areas.DB, 400, 4, 4)
-    #         buffer1 = struct.unpack(">I", buffer1)[0]
-    #         buffer2 = client.read_area(snap7.types.Areas.DB, 400, 8, 4)
-    #         buffer2 = struct.unpack(">I", buffer2)[0]
-    #
-    #         buffer3 = client.read_area(snap7.types.Areas.DB, 400, 0, 8)
-    #         buffer3 = self.bytearray_to_bool_list(buffer3)
-    #         buffer3 = list(buffer3[:3])
-    #         data.append(buffer1)
-    #         data.append(buffer2)
-    #         data = data + buffer3
-    #         self.log.info(f'HMT_data_list: {data}')
-    #         self.log.info(f" ")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error while reading machine statuses: {e}, [{self.plc_ip}]")
-    #
-    # def read_integer2(self, db_num: int, offsets: list) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         data = []
-    #         for off in offsets:
-    #             buf = client.read_area(snap7.types.Areas.DB, db_num, off, 4)
-    #             data.append(struct.unpack(">I", buf)[0])
-    #         self.log.info(f"integer_data: {data}")
-    #         return data
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error reading integer values: {e}")
-    #         return []
-    #
-    # def read_boolean2(self, db_num: int, start: int, bit_count: int) -> list:
-    #     try:
-    #         client = snap7.client.Client()
-    #         client.connect(self.plc_ip, 0, 1)
-    #         buf = client.read_area(snap7.types.Areas.DB, db_num, start, bit_count)
-    #         bools = list(self.bytearray_to_bool_list(buf))[:bit_count]
-    #         self.log.info(f'boolean_list: {bools}')
-    #         return bools
-    #     except Exception as e:
-    #         self.log.error(f"[!] Error reading boolean values: {e}")
-    #         return []
-    #
-    # @staticmethod
-    # def bytearray_to_bool_list(byte_array):
-    #     bool_list = []
-    #     for byte in byte_array:
-    #         for _ in range(8):
-    #             bool_list.append(bool(byte & 1))
-    #             byte >>= 1
-    #     return bool_list
-
     def read_booleans(self, area, db_number=0, start_address=0, bit_positions=None, byte_count=1):
         """
         Read booleans from PLC memory areas.
@@ -286,7 +217,7 @@ class CL_MAIN:
 
             except Exception as e:
                 self.log.error(f"[!] Error in sending OEE data {e}")
-                self.obj_db.add_sync_data(self.api_payload)
+                # self.obj_db.add_sync_data(self.api_payload)
         self.log.info(f" ")
 
     def post_to_telemetry(self) -> None:
@@ -327,7 +258,7 @@ class CL_MAIN:
             try:
                 send_req = requests.post(url, json=self.attr_payload, headers=HEADERS, timeout=5)
                 send_req.raise_for_status()
-                self.log.info(f"post_to_attributes:{send_req.status_code}, Request status code")
+                self.log.info(f"post-to-attributes:{send_req.status_code}, Request status code")
 
                 # for i in self.obj_db.get_sync_data():
                 #     max_ts = max([j['ts'] for j in i])
@@ -409,85 +340,96 @@ class CL_MAIN:
             self.log.error(f"[!!] Error: {e}, unable to fetch the Maintenance status.")
             return None
 
-    def calculate_operating_time(self, green_light_status: bool) -> None:
-        try:
-            self.log.info("Starting Operating time calculation")
-            prev_time_update, prev_status = self.obj_db.getCurrStatus(self.IS_OPERATING)
-            new_time_update, new_status = self.obj_db.getNewStatus(self.IS_OPERATING)
+    # def calculate_operating_time(self, green_light_status: bool) -> None:
+    #     try:
+    #
+    #         # green_light_status = not bool(green_light_status)
+    #
+    #         self.log.info("Starting Operating time calculation")
+    #         prev_time_update, prev_status = self.obj_db.getCurrStatus(self.IS_OPERATING)
+    #         new_time_update, new_status = self.obj_db.getNewStatus(self.IS_OPERATING)
+    #
+    #         if green_light_status:
+    #             operating_status_now = 1
+    #         else:
+    #             operating_status_now = 0
+    #
+    #         if operating_status_now != new_status:
+    #             self.obj_db.updateNewStatus(self.IS_OPERATING, operating_status_now)
+    #
+    #         new_time_update, new_status = self.obj_db.getNewStatus(self.IS_OPERATING)
+    #
+    #         self.log.info(f"Updated operating status -> prev: {prev_status}, new: {new_status}")
+    #
+    #         if prev_status != new_status:
+    #             if new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 3:
+    #                 self.obj_db.add_start_time(self.plant_date, self.curr_shift, True, self.IS_OPERATING)
+    #                 self.obj_db.updateCurrStatus(self.IS_OPERATING, new_status)
+    #                 self.operating_status = True
+    #                 self.log.info(f"green_light_status: {green_light_status} -- Operating-time Started")
+    #
+    #             elif new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 3:
+    #                 self.obj_db.add_stop_time(self.IS_OPERATING)
+    #                 self.obj_db.updateCurrStatus(self.IS_OPERATING, new_status)
+    #                 self.operating_status = False
+    #                 self.log.info(f"green_light_status: {green_light_status} -- Operating-time Stopped")
+    #     except Exception as e:
+    #         self.log.error(f"[!] Error: {e}, while calculating operating time")
+    #     self.log.info(f" ")
 
-            if green_light_status:
-                operating_status_now = 1
-            else:
-                operating_status_now = 0
-
-            if operating_status_now != new_status:
-                self.obj_db.updateNewStatus(self.IS_OPERATING, operating_status_now)
-
-            new_time_update, new_status = self.obj_db.getNewStatus(self.IS_OPERATING)
-
-            self.log.info(f"Updated operating status -> prev: {prev_status}, new: {new_status}")
-
-            if prev_status != new_status:
-                if new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 3:
-                    self.obj_db.add_start_time(self.plant_date, self.curr_shift, True, self.IS_OPERATING)
-                    self.obj_db.updateCurrStatus(self.IS_OPERATING, new_status)
-                    self.operating_status = True
-
-                elif new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 3:
-                    self.obj_db.add_stop_time(self.IS_OPERATING)
-                    self.obj_db.updateCurrStatus(self.IS_OPERATING, new_status)
-                    self.operating_status = False
-        except Exception as e:
-            self.log.error(f"[!] Error: {e}, while calculating operating time")
-        self.log.info(f" ")
-
-    def calculate_idle_time(self, yellow_light_status: bool) -> None:
-        try:
-            self.log.info("Starting Idle time calculation")
-            prev_time_update, prev_status = self.obj_db.getCurrStatus(self.IS_IDLE)
-            new_time_update, new_status = self.obj_db.getNewStatus(self.IS_IDLE)
-
-            if yellow_light_status:
-                idle_status_now = 1
-            else:
-                idle_status_now = 0
-
-            if self.machine_maintenance_status:
-                if self.idle_status:
-                    self.log.info("Maintenance active -- stopping existing Idle time")
-                    self.obj_db.add_stop_time(self.IS_IDLE)
-                    self.obj_db.updateCurrStatus(self.IS_IDLE, 1)
-                    self.idle_status = False
-                else:
-                    self.log.info("Maintenance active -- skipping Idle time start")
-                return
-
-            if idle_status_now != new_status:
-                self.obj_db.updateNewStatus(self.IS_IDLE, idle_status_now)
-
-            new_time_update, new_status = self.obj_db.getNewStatus(self.IS_IDLE)
-
-            self.log.info(f"after checking machine status, updated these status..")
-            self.log.info(f" prev_status:{prev_status}, new_status:{new_status}")
-
-            if prev_status != new_status:
-                if new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 3:
-                    self.obj_db.add_start_time(self.plant_date, self.curr_shift, True, self.IS_IDLE)
-                    self.obj_db.updateCurrStatus(self.IS_IDLE, new_status)
-                    self.idle_status = True
-
-                elif new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 3:
-                    self.obj_db.add_stop_time(self.IS_IDLE)
-                    self.obj_db.updateCurrStatus(self.IS_IDLE, new_status)
-                    self.idle_status = False
-                else:
-                    pass
-        except Exception as e:
-            self.log.error(f"[!] Error: {e}, while calculating idle time ")
-        self.log.info(f" ")
+    # def calculate_idle_time(self, yellow_light_status: bool) -> None:
+    #     try:
+    #         # yellow_light_status = not bool(yellow_light_status)
+    #
+    #         self.log.info("Starting Idle time calculation")
+    #         prev_time_update, prev_status = self.obj_db.getCurrStatus(self.IS_IDLE)
+    #         new_time_update, new_status = self.obj_db.getNewStatus(self.IS_IDLE)
+    #
+    #         if yellow_light_status:
+    #             idle_status_now = 1
+    #         else:
+    #             idle_status_now = 0
+    #
+    #         if self.machine_maintenance_status:
+    #             if self.idle_status:
+    #                 self.log.info("Maintenance active -- stopping existing Idle time")
+    #                 self.obj_db.add_stop_time(self.IS_IDLE)
+    #                 self.obj_db.updateCurrStatus(self.IS_IDLE, 1)
+    #                 self.idle_status = False
+    #             else:
+    #                 self.log.info("Maintenance active -- skipping Idle time start")
+    #             return
+    #
+    #         if idle_status_now != new_status:
+    #             self.obj_db.updateNewStatus(self.IS_IDLE, idle_status_now)
+    #
+    #         new_time_update, new_status = self.obj_db.getNewStatus(self.IS_IDLE)
+    #
+    #         self.log.info(f"after checking machine status, updated these status..")
+    #         self.log.info(f" prev_status:{prev_status}, new_status:{new_status}")
+    #
+    #         if prev_status != new_status:
+    #             if new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 3:
+    #                 self.obj_db.add_start_time(self.plant_date, self.curr_shift, True, self.IS_IDLE)
+    #                 self.obj_db.updateCurrStatus(self.IS_IDLE, new_status)
+    #                 self.idle_status = True
+    #                 self.log.info(f"yellow_light_status: {yellow_light_status} -- Idletime Started")
+    #
+    #             elif new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 3:
+    #                 self.obj_db.add_stop_time(self.IS_IDLE)
+    #                 self.obj_db.updateCurrStatus(self.IS_IDLE, new_status)
+    #                 self.idle_status = False
+    #                 self.log.info(f"yellow_light_status: {yellow_light_status} -- Idletime Stopped")
+    #             else:
+    #                 pass
+    #     except Exception as e:
+    #         self.log.error(f"[!] Error: {e}, while calculating idle time ")
+    #     self.log.info(f" ")
 
     def calculate_breakdown_time(self, red_light_status: bool) -> None:
         try:
+            red_light_status = not bool(red_light_status)
+
             self.log.info("Starting breakdown time calculation")
 
             prev_time_update, prev_status = self.obj_db.getCurrStatus(self.IS_BREAKDOWN)
@@ -514,15 +456,17 @@ class CL_MAIN:
             new_time_update, new_status = self.obj_db.getNewStatus(self.IS_BREAKDOWN)
 
             if prev_status != new_status:
-                if new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 10:
+                if new_status == 0 and (datetime.now() - new_time_update).total_seconds() > 60:
                     self.obj_db.add_start_time(self.plant_date, self.curr_shift, True, self.IS_BREAKDOWN)
                     self.obj_db.updateCurrStatus(self.IS_BREAKDOWN, new_status)
                     self.breakdown_status = True
+                    self.log.info(f"red_light_status: {red_light_status} -- breakdown Started")
 
                 elif new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 10:
                     self.obj_db.add_stop_time(self.IS_BREAKDOWN)
                     self.obj_db.updateCurrStatus(self.IS_BREAKDOWN, new_status)
                     self.breakdown_status = False
+                    self.log.info(f"red_light_status: {red_light_status} -- breakdown Stopped")
                 else:
                     pass
         except Exception as e:
@@ -532,33 +476,43 @@ class CL_MAIN:
 
     def calculations(self) -> None:
         try:
-            self.operating_time = self.obj_db.get_total_duration(self.plant_date, self.curr_shift, self.IS_OPERATING)
-            self.idle_time = self.obj_db.get_total_duration(self.plant_date, self.curr_shift, self.IS_IDLE)
+            # self.operating_time = self.obj_db.get_total_duration(self.plant_date, self.curr_shift, self.IS_OPERATING)
+            # self.idle_time = self.obj_db.get_total_duration(self.plant_date, self.curr_shift, self.IS_IDLE)
             self.breakdown_time = self.obj_db.get_total_duration(self.plant_date, self.curr_shift, self.IS_BREAKDOWN)
 
-            loss_time = self.idle_time + self.breakdown_time
+            loss_time = self.breakdown_time
 
-            cycle_time = 1.33
-            self.working_time_so_far, planned_breaks_dur = self.obj_conversions.get_working_time_so_far(self.curr_shift)
+            if self.machine_name == 'Cosberg Assy-03':
+                cycle_time = 1.2
+            else:
+                cycle_time = 1.09  # 55 parts per min
+
+            self.working_time_so_far, planned_breaks_dur = self.obj_conversions.get_working_time_so_far(self.curr_shift)\
+
+            self.operating_time = self.working_time_so_far - self.breakdown_time
+
+            if self.operating_time < 0:
+                self.operating_time = 0
 
             planned_breaks_dur = planned_breaks_dur.total_seconds()
 
-            self.target_count = round((self.working_time_so_far / cycle_time))
+            self.target_count = round((self.operating_time / cycle_time))
+
         except ArithmeticError as AE:
             self.log.error(AE)
             self.operating_time = 0
-            self.idle_time = 0
+            # self.idle_time = 0
             loss_time = 0
             planned_breaks_dur = 0
         except Exception as e:
             self.log.error(f'Error: {e}, while calculating operating_time')
             self.operating_time = 0
-            self.idle_time = 0
+            # self.idle_time = 0
             loss_time = 0
             planned_breaks_dur = 0
 
         try:
-            performance = self.part_count / self.target_count
+            performance = self.part_count / self.target_count  # target_count = operating_time / cycle_time
             self.log.info(f"[x]**performance: {performance}")
         except ArithmeticError as AE:
             performance = 0
@@ -591,11 +545,11 @@ class CL_MAIN:
             if self.operating_time > self.working_time_so_far:
                 self.operating_time = self.working_time_so_far
 
-            if self.idle_time > self.working_time_so_far:
-                self.idle_time = self.working_time_so_far
+            # if self.idle_time > self.working_time_so_far:
+            #     self.idle_time = self.working_time_so_far
 
-            if self.breakdown_time > self.working_time_so_far:
-                self.breakdown_time = self.working_time_so_far
+            # if self.breakdown_time > self.working_time_so_far:12
+            #     self.breakdown_time = self.working_time_so_far
 
             if loss_time > self.working_time_so_far:
                 loss_time = self.working_time_so_far
@@ -706,10 +660,10 @@ class CL_MAIN:
 
                 # Resetting the machine running status
                 self.log.info(f'Resetting machine running status in db')
-                self.obj_db.updateCurrStatus(self.IS_OPERATING, 1)
-                self.obj_db.updateNewStatus(self.IS_OPERATING, 1)
-                self.obj_db.updateCurrStatus(self.IS_IDLE, 1)
-                self.obj_db.updateNewStatus(self.IS_IDLE, 1)
+                # self.obj_db.updateCurrStatus(self.IS_OPERATING, 1)
+                # self.obj_db.updateNewStatus(self.IS_OPERATING, 1)
+                # self.obj_db.updateCurrStatus(self.IS_IDLE, 1)
+                # self.obj_db.updateNewStatus(self.IS_IDLE, 1)
                 self.obj_db.updateCurrStatus(self.IS_BREAKDOWN, 1)
                 self.obj_db.updateNewStatus(self.IS_BREAKDOWN, 1)
 
@@ -766,7 +720,8 @@ class CL_MAIN:
 
                 status_data = self.obj_snap7.read_booleans(self.db_area, self.bool_db_num,
                                                            self.bool_start_address, self.bool_offsets)
-                operating_status, idle_status, breakdown_status = status_data
+
+                breakdown_status, idle_status, operating_status = status_data
 
                 if self.part_count < 0 or self.part_count > 65000:
                     self.part_count = 0
@@ -777,13 +732,15 @@ class CL_MAIN:
                 self.log.info(f'[*]System Date: {sys_date}')
                 self.machine_maintenance_status = self.fetch_machine_maintenance_status(sys_date, self.curr_shift)
 
-                if operating_status is not None:
-                    self.calculate_operating_time(operating_status)
-                    self.attr_payload['healthy_status'] = operating_status
+                # if operating_status is not None:
+                #     self.calculate_operating_time(operating_status)
+                #     self.attr_payload['healthy_status'] = operating_status
+                #
+                # if idle_status is not None:
+                #     self.calculate_idle_time(idle_status)
+                #     self.attr_payload['ready_status'] = idle_status
 
-                if idle_status is not None:
-                    self.calculate_idle_time(idle_status)
-                    self.attr_payload['ready_status'] = idle_status
+                '''Now we only considering the red light status for breakdowns'''
 
                 if breakdown_status is not None:
                     self.calculate_breakdown_time(breakdown_status)
@@ -791,19 +748,21 @@ class CL_MAIN:
 
                 self.calling_breakdown_funcs()
 
-                if self.part_count > self.prev_part_count:
+                # if self.part_count > self.prev_part_count:
 
-                    self.obj_db.add_production_data(self.plant_date, self.curr_shift, self.target_count, self.part_count,
+                if self.target_count > 0:
+                    self.obj_db.add_production_data(self.plant_date, self.curr_shift, self.target_count,
+                                                    self.part_count,
                                                     self.reject_count, self.operating_time, self.idle_time,
                                                     self.breakdown_time)
 
-                    if (time.time() - self.LAST_OEE_PAYLOAD_SENT) > 60:
-                        self.calculations()
-                        self.post_to_api()
-                        self.post_to_telemetry()
-                        self.post_to_attribute()
-                        send_system_info(HOST, self.access_token)
-                        self.LAST_OEE_PAYLOAD_SENT = time.time()
+                if (time.time() - self.LAST_OEE_PAYLOAD_SENT) > 45:
+                    self.calculations()
+                    self.post_to_api()
+                    self.post_to_telemetry()
+                    self.post_to_attribute()
+                    send_system_info(HOST, self.access_token)
+                    self.LAST_OEE_PAYLOAD_SENT = time.time()
 
                 self.log.info(' ')
                 self.log.info(f"[+] prev_part_count: {self.prev_part_count}")

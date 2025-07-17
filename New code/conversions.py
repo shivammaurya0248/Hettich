@@ -29,8 +29,8 @@ class ShiftManager:
                 "tea_2": [datetime.datetime.now().replace(hour=22, minute=0), 10],
             },
             "C": {
-                "tea_1": [datetime.datetime.now().replace(hour=1, minute=0), 10],
-                "tea_2": [datetime.datetime.now().replace(hour=4, minute=0), 10],
+                "tea_1": [datetime.datetime.now().replace(hour=1, minute=0), 0],
+                "tea_2": [datetime.datetime.now().replace(hour=4, minute=0), 0],
             },
             "G": {
                 "tea_1": [datetime.datetime.now().replace(hour=10, minute=0), 10],

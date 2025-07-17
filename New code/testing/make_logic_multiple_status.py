@@ -43,8 +43,8 @@ class DBHelper:
 
     def add_start_time(self, date_, shift, status, table_name):
         try:
+            self.add_stop_time(table_name)
             if status:
-                self.add_stop_time(table_name)
                 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self.c.execute(f'''INSERT INTO {table_name}(date_, shift, time_, startTime)
                                    VALUES (?,?,?,?)''', (date_, shift, now, now))
@@ -91,6 +91,7 @@ class DBHelper:
 
     def get_total_duration(self, date_, shift, table_name):
         try:
+            self.add_duration_to_null_blocks(table_name)
             self.c.execute(f'''SELECT SUM(duration) FROM {table_name}
                                WHERE date_=? AND shift=?''', (date_, shift))
             result = self.c.fetchone()
@@ -112,7 +113,7 @@ class DBHelper:
     def get_current_duration(self, date_, shift, table_name):
         try:
             self.add_duration_to_null_blocks(table_name)
-            self.add_stop_time(table_name)
+            # self.add_stop_time(table_name)
             self.c.execute(f'''SELECT duration FROM {table_name}
                               WHERE date_=? AND shift=? ORDER BY id DESC LIMIT 1''',
                            (date_, shift))
@@ -128,7 +129,7 @@ class DBHelper:
 
 def main():
     param_list = ['operating', 'idle', 'breakdown']
-    db_name = 'test4'
+    db_name = 'test6'
     tb_name = param_list[0]
     plant_date = '2025-06-13'  # datetime.datetime.now().date()
     shift = 'A'
@@ -141,18 +142,19 @@ def main():
 
     pr_status = True
 
-    # add durations
+
     # db.add_start_time(plant_date, shift, pr_status, tb_name)
-    # db.add_stop_time(tb_name)
+    db.add_stop_time(tb_name)
     # db.add_duration_to_null_blocks(tb_name)
 
-    get_curr_dur = db.get_current_duration(plant_date, shift, tb_name)
-    print(f'get_current_duration: {get_curr_dur}')
+    # get_curr_dur = db.get_current_duration(plant_date, shift, tb_name)
+    # print(f'get_current_duration: {get_curr_dur}')
 
-    total_dur = db.get_total_duration(plant_date, shift, tb_name)
-    total_count = db.get_idle_count(plant_date, shift, tb_name)
-    print(f'total_dur: {total_dur}')
-    print(f'total_count: {total_count}')
+    # total_dur = db.get_total_duration(plant_date, shift, tb_name)
+    # print(f'total_dur: {total_dur}')
+
+    # total_count = db.get_idle_count(plant_date, shift, tb_name)
+    # print(f'total_count: {total_count}')
 
 
 if __name__ == '__main__':
