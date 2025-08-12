@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from ingenious_libs.system_info import send_system_info
 from ingenious_libs import logMan
 from ingenious_libs.utils import ConfReader
@@ -462,7 +463,7 @@ class CL_MAIN:
                     self.breakdown_status = True
                     self.log.info(f"red_light_status: {red_light_status} -- breakdown Started")
 
-                elif new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 10:
+                elif new_status == 1 and (datetime.now() - new_time_update).total_seconds() > 60:
                     self.obj_db.add_stop_time(self.IS_BREAKDOWN)
                     self.obj_db.updateCurrStatus(self.IS_BREAKDOWN, new_status)
                     self.breakdown_status = False
@@ -487,8 +488,7 @@ class CL_MAIN:
             else:
                 cycle_time = 1.09  # 55 parts per min
 
-            self.working_time_so_far, planned_breaks_dur = self.obj_conversions.get_working_time_so_far(self.curr_shift)\
-
+            self.working_time_so_far, planned_breaks_dur = self.obj_conversions.get_working_time_so_far(self.curr_shift)
             self.operating_time = self.working_time_so_far - self.breakdown_time
 
             if self.operating_time < 0:
@@ -710,18 +710,12 @@ class CL_MAIN:
                 self.log.info(f"-------*{self.machine_name} [{self.plc_ip}] CONNECTION IS ACTIVE*----------")
                 self.plant_date, self.curr_shift = self.obj_db.get_misc_data()
 
-                # if self.machine_name.startswith('HMT'):
-                #     data_list = self.obj_snap7.read_HMTs()
-                #     self.part_count, self.reject_count,  operating_status, idle_status, breakdown_status = data_list
-                # else:
                 self.part_count, self.reject_count = self.obj_snap7.read_integer(self.int_db_num, self.int_offsets)
 
                 self.prev_part_count = self.obj_db.get_prev_part_count(self.plant_date, self.curr_shift)
 
                 status_data = self.obj_snap7.read_booleans(self.db_area, self.bool_db_num,
                                                            self.bool_start_address, self.bool_offsets)
-
-                breakdown_status, idle_status, operating_status = status_data
 
                 if self.part_count < 0 or self.part_count > 65000:
                     self.part_count = 0
@@ -732,19 +726,32 @@ class CL_MAIN:
                 self.log.info(f'[*]System Date: {sys_date}')
                 self.machine_maintenance_status = self.fetch_machine_maintenance_status(sys_date, self.curr_shift)
 
-                # if operating_status is not None:
-                #     self.calculate_operating_time(operating_status)
-                #     self.attr_payload['healthy_status'] = operating_status
-                #
-                # if idle_status is not None:
-                #     self.calculate_idle_time(idle_status)
-                #     self.attr_payload['ready_status'] = idle_status
-
                 '''Now we only considering the red light status for breakdowns'''
 
-                if breakdown_status is not None:
-                    self.calculate_breakdown_time(breakdown_status)
-                    self.attr_payload['stop_status'] = breakdown_status
+                breakdown_status, idle_status, operating_status = status_data
+
+                self.log.info(f"[+] green-light/operating status: {operating_status}")
+                self.log.info(f"[+] yellow-light/idle status: {idle_status}")
+                self.log.info(f"[+] red-light/breakdown status: {breakdown_status}")
+
+                if self.machine_name not in ['HMT Assy-1', 'HMT Assy-2']:
+                    self.log.info(f"[+] Entered in special machine logic...")
+                    if breakdown_status is not None:
+                        is_breakdown = (breakdown_status or idle_status) and not operating_status
+                        self.log.info(f'[+] is_breakdown: {is_breakdown}')
+                        self.calculate_breakdown_time(is_breakdown)
+                        self.attr_payload['stop_status'] = is_breakdown
+                else:
+                    if breakdown_status is not None:
+                        is_breakdown = breakdown_status and not idle_status and not operating_status
+                        self.log.info(f'[+] is_breakdown: {is_breakdown}')
+                        self.calculate_breakdown_time(is_breakdown)
+                        self.attr_payload['stop_status'] = is_breakdown
+
+                if self.breakdown_status:
+                    self.log.info(f"[\U0001F6A8] Breakdown ongoing — machine operations halted.")
+                else:
+                    self.log.info(f"[\u2705] Machine is not  in breakdown state.")
 
                 self.calling_breakdown_funcs()
 
@@ -768,14 +775,15 @@ class CL_MAIN:
                 self.log.info(f"[+] prev_part_count: {self.prev_part_count}")
                 self.log.info(f"[+] part_count: {self.part_count}")
                 self.log.info(f"[+] reject_count: {self.reject_count}")
-                self.log.info(f"[+] green-light/operating status: {operating_status}")
-                self.log.info(f"[+] yellow-light/idle status: {idle_status}")
-                self.log.info(f"[+] red-light/breakdown status: {breakdown_status}")
-                self.log.info(f"[+]target_count: {self.target_count}")
-                self.log.info(f"[+]planned_time: {round(self.working_time_so_far / 60, 2)}")
-                self.log.info(f"[+]operating_time: {round(self.operating_time / 60, 2)}")
-                self.log.info(f"[+]idle_time: {round(self.idle_time / 60, 2)}")
-                self.log.info(f"[+]breakdown_time: {round(self.breakdown_time / 60, 2)}")
+                self.log.info(f"[+] target_count: {self.target_count}")
+                self.log.info(f"[+] planned_time: {round(self.working_time_so_far / 60, 2)}")
+                self.log.info(f"[+] operating_time: {round(self.operating_time / 60, 2)}")
+                self.log.info(f"[+] idle_time: {round(self.idle_time / 60, 2)}")
+                self.log.info(f"[+] breakdown_time: {round(self.breakdown_time / 60, 2)}")
+
+
+
+
                 self.log.info(' ')
 
         except Exception as e:
